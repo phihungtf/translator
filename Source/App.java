@@ -119,6 +119,11 @@ public class App extends javax.swing.JFrame {
         controlPanel.add(markFavBtn, gridBagConstraints);
 
         toggleFavBtn.setText(">>");
+        toggleFavBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                toggleFavBtnActionPerformed(evt);
+            }
+        });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
         controlPanel.add(toggleFavBtn, gridBagConstraints);
@@ -363,7 +368,18 @@ public class App extends javax.swing.JFrame {
         );
 
         pack();
-    }// </editor-fold>                        
+    }                   
+
+    private void toggleFavBtnActionPerformed(java.awt.event.ActionEvent evt) {   
+		// togle favoritePanel
+		if (favoritePanel.isVisible()) {
+			favoritePanel.setVisible(false);
+			toggleFavBtn.setText("<<");
+		} else {
+			favoritePanel.setVisible(true);
+			toggleFavBtn.setText("<<");
+		}
+    }                  
 
     private void findBtnActionPerformed(java.awt.event.ActionEvent evt) {                                        
         // TODO add your handling code here:
@@ -398,7 +414,6 @@ public class App extends javax.swing.JFrame {
         } catch (javax.swing.UnsupportedLookAndFeelException ex) {
             java.util.logging.Logger.getLogger(App.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
-        //</editor-fold>
 
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
