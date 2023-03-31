@@ -52,3 +52,10 @@ The application has the following features:
 - View all favorite words.
 - Remove a word from the favorite list.
 - View history of words that have been looked up from a date to another date.
+
+## Author
+
+Võ Phi Hùng ([@phihungtf](https://github.com/phihungtf))
+
+- 20120489 ([20120489@student.hcmus.edu.vn](mailto:20120489@student.hcmus.edu.vn))
+- Personal e-mail: [phihungtf@gmail.com](mailto:phihungtf@gmail.com)
