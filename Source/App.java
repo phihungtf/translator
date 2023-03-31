@@ -1,24 +1,28 @@
-import java.awt.Component;
-import java.awt.event.ActionEvent;
+import java.awt.*;
+import java.awt.event.*;
 import java.io.File;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 
-import javax.swing.AbstractListModel;
-import javax.swing.ComboBoxModel;
-import javax.swing.JList;
+import javax.swing.*;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import javax.swing.plaf.basic.BasicComboBoxRenderer;
-import javax.swing.table.AbstractTableModel;
+import javax.swing.table.*;
 
 import dialog.InputFrame;
 import favorite.WordItem;
 import favorite.WordList;
+import history.*;
 import record.*;
 
 
 class FavWordTableModel extends AbstractTableModel {
 	private WordList list;
 	private String[] columns;
-	public boolean isUpdated = false;
 
 	public FavWordTableModel(WordList list) {
 		super();
@@ -60,22 +64,72 @@ class FavWordTableModel extends AbstractTableModel {
 	public void setValueAt(Object value, int row, int col) {
 		list.setValueAt(value, row, col - 1);
         fireTableCellUpdated(row, col);
-		this.isUpdated = true;
     }
 
 	// Optional, the name of your column
 	public String getColumnName(int col) {
 		return columns[col];
 	}
+}
 
-	public void addRow(WordItem word) {
-		list.add(word);
-		fireTableRowsInserted(list.size() - 1, list.size() - 1);
+class HistoryTableModel extends AbstractTableModel {
+	private ArrayList<LogRow> data;
+	private String[] columns;
+
+	public HistoryTableModel(LogList list, LocalDate fromDate, LocalDate toDate) {
+		super();
+		columns = new String[] {"No.", "Word", "Frequency", "Lang"};
+		data = list.getLogRows(fromDate, toDate);
 	}
 
-	public void removeRow(int index) {
-		list.remove(index);
-		fireTableRowsDeleted(index, index);
+	public void update(LogList list, LocalDate fromDate, LocalDate toDate) {
+		data = list.getLogRows(fromDate, toDate);
+		fireTableDataChanged();
+	}
+
+	// Number of column of your table
+	public int getColumnCount() {
+		return columns.length;
+	}
+
+	// Number of row of your table
+	public int getRowCount() {
+		return data.size();
+	}
+
+	// The object to render in a cell
+	public Object getValueAt(int row, int col) {
+		if (col == 0) return row + 1;
+		switch (col) {
+			case 1: return data.get(row).getWord();
+			case 2: return data.get(row).getFrequency();
+			case 3: return data.get(row).getLang();
+			default: return null;
+		}
+	}
+
+	/**
+	 * This method returns true if the cell at the given row and column is
+	 * editable. Otherwise, it returns false.
+	 */
+	public boolean isCellEditable(int row, int col) {
+		return false;
+	}
+
+	/**
+	 * This method is called whenever a value in the table is changed.
+	 * 
+	 * @param value the new value
+	 * @param row the row of the cell that was changed
+	 * @param col the column of the cell that was changed
+	 */
+	public void setValueAt(Object value, int row, int col) {
+        fireTableCellUpdated(row, col);
+    }
+
+	// Optional, the name of your column
+	public String getColumnName(int col) {
+		return columns[col];
 	}
 }
 
@@ -99,18 +153,22 @@ class MyComboBoxModel extends AbstractListModel<Word> implements ComboBoxModel<W
 
 	@Override
 	public void setSelectedItem(Object selected) {
-		System.out.println("Type: " + selected.getClass().getName());
 		if (selected instanceof Word) {
 			this.selectedItem = (Word) selected;
-		} else if (selected instanceof String) {
+			fireContentsChanged(selected, -1, -1);
+			return;
+		}
+		if (selected instanceof String) {
 			for (Word word : data) {
 				if (word.getWord().equals(selected)) {
 					this.selectedItem = word;
+					fireContentsChanged(selected, -1, -1);
 					return;
 				}
 			}
-			this.selectedItem = new Word((String) selected, -1);
 		}
+		this.selectedItem = new Word((String) selected, -1);
+		fireContentsChanged(selected, -1, -1);
 	}
 
 	@Override
@@ -150,20 +208,28 @@ class ItemRenderer extends BasicComboBoxRenderer {
 
 public class App extends javax.swing.JFrame implements InputFrame.InputListener {
 	public String lang = "en-vi";
+	DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 	public File vienFile = new File("Files/Viet_Anh.xml");
 	public File enviFile = new File("Files/test.xml");
+	public File favFile = new File("Files/favorite.csv");
+	public File historyFile = new File("Files/history.csv");
 
 	public MyComboBoxModel wordInputBoxModel;
 	public FavWordTableModel favWordTableModel;
+	public HistoryTableModel historyTableModel;
 
 	public App() {
 		recordList = new RecordList();
+		wordList = new WordList();
+		logList = new LogList();
 		try {
 			if (lang.equals("en-vi")) {
 				recordList.parseXML(enviFile);
 			} else {
 				recordList.parseXML(vienFile);
 			}
+			wordList.readCSV(favFile);
+			logList.readCSV(historyFile);
 		} catch (Exception e) {
 			System.out.println("Error: " + e.getMessage());
 			e.printStackTrace();
@@ -176,65 +242,65 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		markFavBtn.setEnabled(false);
 
 		System.out.println("Init components done");
-		// recordBox.setText(curRecordList.toString());
 
 	}
 
 	private void initComponents() {
 		java.awt.GridBagConstraints gridBagConstraints;
-		TabbedPane = new javax.swing.JTabbedPane();
-		translatorTab = new javax.swing.JPanel();
-		translatorPanel = new javax.swing.JPanel();
-		wordInputPanel = new javax.swing.JPanel();
-		langSwitchBtn = new javax.swing.JButton();
-		// wordInput = new javax.swing.JTextField();
-		wordInputBox = new javax.swing.JComboBox<Word>();
-		findBtn = new javax.swing.JButton();
-		recordPanel = new javax.swing.JScrollPane();
-		recordBox = new javax.swing.JTextArea();
-		controlPanel = new javax.swing.JPanel();
-		addBtn = new javax.swing.JButton();
-		removeBtn = new javax.swing.JButton();
-		markFavBtn = new javax.swing.JButton();
-		toggleFavBtn = new javax.swing.JToggleButton();
-		favoritePanel = new javax.swing.JPanel();
-		favWordLabel = new javax.swing.JLabel();
-		favWordPanel = new javax.swing.JScrollPane();
-		favWordTable = new javax.swing.JTable();
-		favCtrlPanel = new javax.swing.JPanel();
-		removeFavBtn = new javax.swing.JButton();
-		historyTab = new javax.swing.JPanel();
-		dateInputPanel = new javax.swing.JPanel();
-		fromLabel = new javax.swing.JLabel();
-		fromDateInput = new javax.swing.JFormattedTextField();
-		toLabel = new javax.swing.JLabel();
-		toDateInput = new javax.swing.JFormattedTextField();
-		findHistoryBtn = new javax.swing.JButton();
-		historyPanel = new javax.swing.JScrollPane();
-		historyTable = new javax.swing.JTable();
-		preferencesTab = new javax.swing.JPanel();
-		filesSettingPanel = new javax.swing.JPanel();
-		enviDicLabel = new javax.swing.JLabel();
-		enviDicFileInput = new javax.swing.JTextField();
-		enviDicFileBtn = new javax.swing.JButton();
-		vienDicLabel = new javax.swing.JLabel();
-		vienDicFileInput = new javax.swing.JTextField();
-		vienDicFilebtn = new javax.swing.JButton();
-		favLabel = new javax.swing.JLabel();
-		favFileInput = new javax.swing.JTextField();
-		favFileBtn = new javax.swing.JButton();
-		historyLabel = new javax.swing.JLabel();
-		historyFileInput = new javax.swing.JTextField();
-		historyFileBtn = new javax.swing.JButton();
-		aboutPanel = new javax.swing.JPanel();
+		TabbedPane = new JTabbedPane();
+		translatorTab = new JPanel();
+		translatorPanel = new JPanel();
+		wordInputPanel = new JPanel();
+		langSwitchBtn = new JButton();
+		// wordInput = new JTextField();
+		wordInputBox = new JComboBox<Word>();
+		findBtn = new JButton();
+		recordPanel = new JScrollPane();
+		recordBox = new JTextArea();
+		controlPanel = new JPanel();
+		addBtn = new JButton();
+		removeBtn = new JButton();
+		markFavBtn = new JButton();
+		toggleFavBtn = new JToggleButton();
+		favoritePanel = new JPanel();
+		favWordLabel = new JLabel();
+		favWordPanel = new JScrollPane();
+		favWordTable = new JTable();
+		favCtrlPanel = new JPanel();
+		removeFavBtn = new JButton();
+		getMeaningBtn = new JButton();
+		historyTab = new JPanel();
+		dateInputPanel = new JPanel();
+		fromLabel = new JLabel();
+		fromDateInput = new JFormattedTextField();
+		toLabel = new JLabel();
+		toDateInput = new JFormattedTextField();
+		findHistoryBtn = new JButton();
+		historyPanel = new JScrollPane();
+		historyTable = new JTable();
+		preferencesTab = new JPanel();
+		fileSettingsPanel = new JPanel();
+		enviDicLabel = new JLabel();
+		enviDicFileInput = new JTextField();
+		enviDicFileBtn = new JButton();
+		vienDicLabel = new JLabel();
+		vienDicFileInput = new JTextField();
+		vienDicFilebtn = new JButton();
+		favLabel = new JLabel();
+		favFileInput = new JTextField();
+		favFileBtn = new JButton();
+		historyLabel = new JLabel();
+		historyFileInput = new JTextField();
+		historyFileBtn = new JButton();
+		aboutPanel = new JPanel();
 
-		setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+		setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 		setMinimumSize(new java.awt.Dimension(1000, 0));
 		setPreferredSize(new java.awt.Dimension(500, 400));
 
-		translatorTab.setLayout(new javax.swing.BoxLayout(translatorTab, javax.swing.BoxLayout.LINE_AXIS));
+		translatorTab.setLayout(new BoxLayout(translatorTab, BoxLayout.LINE_AXIS));
 
-		translatorPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		translatorPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		translatorPanel.setLayout(new java.awt.BorderLayout(0, 5));
 
 		wordInputPanel.setLayout(new java.awt.GridBagLayout());
@@ -346,7 +412,7 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 
 		translatorTab.add(translatorPanel);
 
-		favoritePanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 0, 8, 8));
+		favoritePanel.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 8));
 		favoritePanel.setMaximumSize(new java.awt.Dimension(400, 2147483647));
 		favoritePanel.setMinimumSize(new java.awt.Dimension(200, 89));
 		favoritePanel.setPreferredSize(new java.awt.Dimension(250, 100));
@@ -355,21 +421,45 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		favWordLabel.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
 		favWordLabel.setText("Favorite Words");
 		favWordLabel.setAlignmentX(0.5F);
-		favWordLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(1, 1, 4, 1));
+		favWordLabel.setBorder(BorderFactory.createEmptyBorder(1, 1, 4, 1));
 		favWordLabel.setMinimumSize(new java.awt.Dimension(93, 20));
 		favWordLabel.setPreferredSize(new java.awt.Dimension(100, 23));
 		favoritePanel.add(favWordLabel, java.awt.BorderLayout.NORTH);
 
 		favWordPanel.setPreferredSize(new java.awt.Dimension(200, 400));
-		favWordTableModel = new FavWordTableModel(new WordList());
+		favWordTableModel = new FavWordTableModel(wordList);
 		favWordTable.setModel(favWordTableModel);
 		// favWordTable.setPreferredSize(new java.awt.Dimension(200, 80));
 		favWordTable.getTableHeader().setReorderingAllowed(false);
+
+		int[] preferredWidth = {10, 80, 10};
+		for (int i = 0; i < 3; i++) {
+			TableColumn column = favWordTable.getColumnModel().getColumn(i);
+			column.setPreferredWidth(preferredWidth[i]);
+		}
+		favWordTable.addMouseListener(new MouseAdapter() {
+			public void mousePressed(MouseEvent mouseEvent) {
+				if (mouseEvent.getClickCount() == 2 && favWordTable.getSelectedRow() != -1) {
+					// your valueChanged overridden method
+					getMeaningFromFavorite();
+				}
+			}
+		});
 		favWordPanel.setViewportView(favWordTable);
 
 		favoritePanel.add(favWordPanel, java.awt.BorderLayout.CENTER);
 
 		favCtrlPanel.setLayout(new java.awt.GridBagLayout());
+
+		getMeaningBtn.setText("Get meaning");
+		getMeaningBtn.addActionListener(new java.awt.event.ActionListener() {
+			public void actionPerformed(java.awt.event.ActionEvent evt) {
+				getMeaningBtnActionPerformed(evt);
+			}
+		});
+		gridBagConstraints = new java.awt.GridBagConstraints();
+		gridBagConstraints.insets = new java.awt.Insets(0, 0, 0, 5);
+		favCtrlPanel.add(getMeaningBtn, gridBagConstraints);
 
 		removeFavBtn.setText("Remove from favorite");
 		removeFavBtn.addActionListener(new java.awt.event.ActionListener() {
@@ -385,18 +475,17 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 
 		TabbedPane.addTab("Translator", translatorTab);
 
-		historyTab.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		historyTab.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		historyTab.setLayout(new java.awt.BorderLayout());
 
-		dateInputPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(1, 1, 5, 1));
+		dateInputPanel.setBorder(BorderFactory.createEmptyBorder(1, 1, 5, 1));
 		dateInputPanel.setLayout(new java.awt.GridBagLayout());
 
 		fromLabel.setText("From");
 		dateInputPanel.add(fromLabel, new java.awt.GridBagConstraints());
 
 		fromDateInput.setColumns(10);
-		fromDateInput.setFormatterFactory(
-				new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.DateFormatter()));
+		fromDateInput.setText(LocalDate.now().format(formatter));
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.insets = new java.awt.Insets(0, 5, 0, 5);
 		dateInputPanel.add(fromDateInput, gridBagConstraints);
@@ -405,31 +494,33 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		dateInputPanel.add(toLabel, new java.awt.GridBagConstraints());
 
 		toDateInput.setColumns(10);
-		toDateInput.setFormatterFactory(
-				new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.DateFormatter()));
+		toDateInput.setText(LocalDate.now().format(formatter));
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.insets = new java.awt.Insets(0, 5, 0, 5);
 		dateInputPanel.add(toDateInput, gridBagConstraints);
 
 		findHistoryBtn.setText("Find");
+
+		findHistoryBtn.addActionListener(new java.awt.event.ActionListener() {
+			public void actionPerformed(java.awt.event.ActionEvent evt) {
+				findHistoryBtnActionPerformed(evt);
+			}
+		});
 		dateInputPanel.add(findHistoryBtn, new java.awt.GridBagConstraints());
 
 		historyTab.add(dateInputPanel, java.awt.BorderLayout.PAGE_START);
 
-		historyTable.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 8, 8, 8));
-		historyTable.setModel(new javax.swing.table.DefaultTableModel(
-			new Object[][] {},
-			new String[] {
-				"No.", "Word", "Frequency", "Lang"
-			}) {
-			boolean[] canEdit = new boolean[] {
-				false, false, false, false
-			};
+		historyTable.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		historyTableModel = new HistoryTableModel(logList, LocalDate.now(), LocalDate.now());
+		historyTable.setModel(historyTableModel);
+		historyTable.getTableHeader().setReorderingAllowed(false);
 
-			public boolean isCellEditable(int rowIndex, int columnIndex) {
-				return canEdit[columnIndex];
-			}
-		});
+		int[] w = {100, 700, 100, 100};
+		for (int i = 0; i < 4; i++) {
+			TableColumn column = historyTable.getColumnModel().getColumn(i);
+			column.setPreferredWidth(w[i]);
+		}
+
 		historyPanel.setViewportView(historyTable);
 
 		historyTab.add(historyPanel, java.awt.BorderLayout.CENTER);
@@ -438,15 +529,15 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 
 		preferencesTab.setLayout(new java.awt.BorderLayout());
 
-		filesSettingPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 8, 8, 8));
-		filesSettingPanel.setLayout(new java.awt.GridBagLayout());
+		fileSettingsPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		fileSettingsPanel.setLayout(new java.awt.GridBagLayout());
 
 		enviDicLabel.setText("EN-VI Dictionary:");
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridx = 0;
 		gridBagConstraints.gridy = 0;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHEAST;
-		filesSettingPanel.add(enviDicLabel, gridBagConstraints);
+		fileSettingsPanel.add(enviDicLabel, gridBagConstraints);
 
 		enviDicFileInput.setEditable(false);
 		enviDicFileInput.setColumns(20);
@@ -457,7 +548,7 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
 		gridBagConstraints.weightx = 1.0;
 		gridBagConstraints.insets = new java.awt.Insets(0, 8, 8, 8);
-		filesSettingPanel.add(enviDicFileInput, gridBagConstraints);
+		fileSettingsPanel.add(enviDicFileInput, gridBagConstraints);
 
 		enviDicFileBtn.setText("Change");
 		enviDicFileBtn.addActionListener(new java.awt.event.ActionListener() {
@@ -468,14 +559,14 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridy = 0;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-		filesSettingPanel.add(enviDicFileBtn, gridBagConstraints);
+		fileSettingsPanel.add(enviDicFileBtn, gridBagConstraints);
 
 		vienDicLabel.setText("VI-EN Dictionary:");
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridx = 0;
 		gridBagConstraints.gridy = 1;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHEAST;
-		filesSettingPanel.add(vienDicLabel, gridBagConstraints);
+		fileSettingsPanel.add(vienDicLabel, gridBagConstraints);
 
 		vienDicFileInput.setEditable(false);
 		gridBagConstraints = new java.awt.GridBagConstraints();
@@ -484,20 +575,20 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
 		gridBagConstraints.weightx = 1.0;
 		gridBagConstraints.insets = new java.awt.Insets(0, 8, 8, 8);
-		filesSettingPanel.add(vienDicFileInput, gridBagConstraints);
+		fileSettingsPanel.add(vienDicFileInput, gridBagConstraints);
 
 		vienDicFilebtn.setText("Change");
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridy = 1;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-		filesSettingPanel.add(vienDicFilebtn, gridBagConstraints);
+		fileSettingsPanel.add(vienDicFilebtn, gridBagConstraints);
 
 		favLabel.setText("Favorite:");
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridx = 0;
 		gridBagConstraints.gridy = 2;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHEAST;
-		filesSettingPanel.add(favLabel, gridBagConstraints);
+		fileSettingsPanel.add(favLabel, gridBagConstraints);
 
 		favFileInput.setEditable(false);
 		favFileInput.setColumns(20);
@@ -508,21 +599,21 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
 		gridBagConstraints.weightx = 1.0;
 		gridBagConstraints.insets = new java.awt.Insets(0, 8, 8, 8);
-		filesSettingPanel.add(favFileInput, gridBagConstraints);
+		fileSettingsPanel.add(favFileInput, gridBagConstraints);
 
 		favFileBtn.setText("Change");
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridy = 2;
 		gridBagConstraints.gridheight = 3;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-		filesSettingPanel.add(favFileBtn, gridBagConstraints);
+		fileSettingsPanel.add(favFileBtn, gridBagConstraints);
 
 		historyLabel.setText("History:");
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridx = 0;
 		gridBagConstraints.gridy = 3;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHEAST;
-		filesSettingPanel.add(historyLabel, gridBagConstraints);
+		fileSettingsPanel.add(historyLabel, gridBagConstraints);
 
 		historyFileInput.setEditable(false);
 		historyFileInput.setColumns(20);
@@ -533,40 +624,61 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
 		gridBagConstraints.weightx = 1.0;
 		gridBagConstraints.insets = new java.awt.Insets(0, 8, 8, 8);
-		filesSettingPanel.add(historyFileInput, gridBagConstraints);
+		fileSettingsPanel.add(historyFileInput, gridBagConstraints);
 
 		historyFileBtn.setText("Change");
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.gridy = 3;
 		gridBagConstraints.gridheight = java.awt.GridBagConstraints.RELATIVE;
 		gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-		filesSettingPanel.add(historyFileBtn, gridBagConstraints);
+		fileSettingsPanel.add(historyFileBtn, gridBagConstraints);
 
-		preferencesTab.add(filesSettingPanel, java.awt.BorderLayout.NORTH);
+		fileSettingsPanel.setBorder(new CompoundBorder(new TitledBorder("File Settings "), new EmptyBorder(8, 8, 8, 8)));
 
-		javax.swing.GroupLayout aboutPanelLayout = new javax.swing.GroupLayout(aboutPanel);
+		preferencesTab.add(fileSettingsPanel, java.awt.BorderLayout.NORTH);
+
+		GroupLayout aboutPanelLayout = new GroupLayout(aboutPanel);
 		aboutPanel.setLayout(aboutPanelLayout);
 		aboutPanelLayout.setHorizontalGroup(
-				aboutPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+				aboutPanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING)
 						.addGap(0, 624, Short.MAX_VALUE));
 		aboutPanelLayout.setVerticalGroup(
-				aboutPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+				aboutPanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING)
 						.addGap(0, 233, Short.MAX_VALUE));
 
 		preferencesTab.add(aboutPanel, java.awt.BorderLayout.CENTER);
 
 		TabbedPane.addTab("Preferences", preferencesTab);
 
-		javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
+		GroupLayout layout = new GroupLayout(getContentPane());
 		getContentPane().setLayout(layout);
 		layout.setHorizontalGroup(
-				layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-						.addComponent(TabbedPane, javax.swing.GroupLayout.DEFAULT_SIZE, 624, Short.MAX_VALUE));
+				layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+						.addComponent(TabbedPane, GroupLayout.DEFAULT_SIZE, 624, Short.MAX_VALUE));
 		layout.setVerticalGroup(
-				layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-						.addComponent(TabbedPane, javax.swing.GroupLayout.DEFAULT_SIZE, 400, Short.MAX_VALUE));
+				layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+						.addComponent(TabbedPane, GroupLayout.DEFAULT_SIZE, 400, Short.MAX_VALUE));
 
 		pack();
+	}
+
+	protected void findHistoryBtnActionPerformed(ActionEvent evt) {
+		try {
+			LocalDate fromDate = LocalDate.parse(fromDateInput.getText(), formatter);
+			LocalDate toDate = LocalDate.parse(toDateInput.getText(), formatter);
+			historyTableModel.update(logList, fromDate, toDate);
+		} catch (DateTimeParseException e) {
+			JOptionPane.showMessageDialog(this, "Invalid date format. Please use dd-MM-yyyy", "Error", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+
+	}
+
+	protected void getMeaningBtnActionPerformed(ActionEvent evt) {
+		if (favWordTable.getSelectedRow() < 0) {
+			return;
+		}
+		getMeaningFromFavorite();
 	}
 
 	protected void removeFavBtnActionPerformed(ActionEvent evt) {
@@ -574,7 +686,15 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		int row = favWordTable.getSelectedRow();
 		// delete
 		if (row >= 0) {
-			favWordTableModel.removeRow(row);
+			wordList.remove(row);
+			favWordTableModel.fireTableRowsDeleted(row, row);
+			try {
+				wordList.writeCSV(favFile);
+			} catch (Exception e) {
+				System.out.println("Error: " + e.getMessage());
+				e.printStackTrace();
+				System.exit(1);
+			}
 		}
 	}
 
@@ -582,7 +702,16 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		Word word = (Word) wordInputBox.getSelectedItem();
 		int index = word.getId();
 		if (index >= 0) {
-			favWordTableModel.addRow(new WordItem(word.getWord(), lang.substring(0, 2)));
+			WordItem wordItem = new WordItem(word.getWord(), lang.substring(0, 2));
+			wordList.add(wordItem);
+			favWordTableModel.fireTableRowsInserted(wordList.size() - 1, wordList.size() - 1);
+			try {
+				wordList.writeCSV(favFile);
+			} catch (Exception e) {
+				System.out.println("Error: " + e.getMessage());
+				e.printStackTrace();
+				System.exit(1);
+			}
 		}
 	}
 
@@ -649,6 +778,14 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		if (index >= 0) {
 			// show result
 			recordBox.setText(recordList.get(index).getMeaning());
+			// log
+			try {
+				logList.add(historyFile, new Log(word.getWord(), lang.substring(0, 2)));
+			} catch (Exception e) {
+				System.out.println("Error: " + e.getMessage());
+				e.printStackTrace();
+				System.exit(1);
+			}
 			// enable buttons
 			removeBtn.setEnabled(true);
 			markFavBtn.setEnabled(true);
@@ -687,6 +824,32 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		// TODO add your handling code here:
 	}
 
+	private void getMeaningFromFavorite() {
+		// get word
+		String word = favWordTable.getValueAt(favWordTable.getSelectedRow(), 1).toString();
+		if (word == null) {
+			return;
+		}
+		// get meaning
+		RecordItem record = getRecordItemByWord(word);
+		if (record != null) {
+			wordInputBox.setSelectedItem(record.getWord());
+			recordBox.setText(record.getMeaning());
+		} else {
+			wordInputBox.setSelectedItem(word);
+			recordBox.setText("Word does not exist or has been deleted.");
+		}
+	}
+
+	private RecordItem getRecordItemByWord(String word) {
+		for (RecordItem record : recordList.getRecordList()) {
+			if (record.getWord().equals(word)) {
+				return record;
+			}
+		}
+		return null;
+	}
+
 	/**
 	 * @param args the command line arguments
 	 */
@@ -701,9 +864,9 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 		 * http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html
 		 */
 		try {
-			for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+			for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
 				if ("Windows".equals(info.getName())) {
-					javax.swing.UIManager.setLookAndFeel(info.getClassName());
+					UIManager.setLookAndFeel(info.getClassName());
 					break;
 				}
 			}
@@ -713,7 +876,7 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 			java.util.logging.Logger.getLogger(App.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
 		} catch (IllegalAccessException ex) {
 			java.util.logging.Logger.getLogger(App.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-		} catch (javax.swing.UnsupportedLookAndFeelException ex) {
+		} catch (UnsupportedLookAndFeelException ex) {
 			java.util.logging.Logger.getLogger(App.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
 		}
 
@@ -727,51 +890,54 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 
 	// Variables declaration - do not modify
 	private RecordList recordList;
+	private WordList wordList;
+	private LogList logList;
 
-	private javax.swing.JTabbedPane TabbedPane;
-	private javax.swing.JPanel aboutPanel;
-	private javax.swing.JButton addBtn;
-	private javax.swing.JPanel controlPanel;
-	private javax.swing.JPanel dateInputPanel;
-	private javax.swing.JButton enviDicFileBtn;
-	private javax.swing.JTextField enviDicFileInput;
-	private javax.swing.JLabel enviDicLabel;
-	private javax.swing.JPanel favCtrlPanel;
-	private javax.swing.JButton favFileBtn;
-	private javax.swing.JTextField favFileInput;
-	private javax.swing.JLabel favLabel;
-	private javax.swing.JLabel favWordLabel;
-	private javax.swing.JScrollPane favWordPanel;
-	private javax.swing.JTable favWordTable;
-	private javax.swing.JPanel favoritePanel;
-	private javax.swing.JPanel filesSettingPanel;
-	private javax.swing.JButton findBtn;
-	private javax.swing.JButton findHistoryBtn;
-	private javax.swing.JFormattedTextField fromDateInput;
-	private javax.swing.JLabel fromLabel;
-	private javax.swing.JButton historyFileBtn;
-	private javax.swing.JTextField historyFileInput;
-	private javax.swing.JLabel historyLabel;
-	private javax.swing.JScrollPane historyPanel;
-	private javax.swing.JPanel historyTab;
-	private javax.swing.JTable historyTable;
-	private javax.swing.JButton langSwitchBtn;
-	private javax.swing.JButton markFavBtn;
-	private javax.swing.JPanel preferencesTab;
-	private javax.swing.JTextArea recordBox;
-	private javax.swing.JScrollPane recordPanel;
-	private javax.swing.JButton removeBtn;
-	private javax.swing.JButton removeFavBtn;
-	private javax.swing.JFormattedTextField toDateInput;
-	private javax.swing.JLabel toLabel;
-	private javax.swing.JToggleButton toggleFavBtn;
-	private javax.swing.JPanel translatorPanel;
-	private javax.swing.JPanel translatorTab;
-	private javax.swing.JTextField vienDicFileInput;
-	private javax.swing.JButton vienDicFilebtn;
-	private javax.swing.JLabel vienDicLabel;
-	// private javax.swing.JTextField wordInput;
-	private javax.swing.JComboBox<Word> wordInputBox;
-	private javax.swing.JPanel wordInputPanel;
+	private JTabbedPane TabbedPane;
+	private JPanel aboutPanel;
+	private JButton addBtn;
+	private JPanel controlPanel;
+	private JPanel dateInputPanel;
+	private JButton enviDicFileBtn;
+	private JTextField enviDicFileInput;
+	private JLabel enviDicLabel;
+	private JPanel favCtrlPanel;
+	private JButton favFileBtn;
+	private JTextField favFileInput;
+	private JLabel favLabel;
+	private JLabel favWordLabel;
+	private JScrollPane favWordPanel;
+	private JTable favWordTable;
+	private JPanel favoritePanel;
+	private JPanel fileSettingsPanel;
+	private JButton findBtn;
+	private JButton findHistoryBtn;
+	private JFormattedTextField fromDateInput;
+	private JLabel fromLabel;
+	private JButton historyFileBtn;
+	private JTextField historyFileInput;
+	private JLabel historyLabel;
+	private JScrollPane historyPanel;
+	private JPanel historyTab;
+	private JTable historyTable;
+	private JButton langSwitchBtn;
+	private JButton markFavBtn;
+	private JPanel preferencesTab;
+	private JTextArea recordBox;
+	private JScrollPane recordPanel;
+	private JButton removeBtn;
+	private JButton removeFavBtn;
+	private JButton getMeaningBtn;
+	private JFormattedTextField toDateInput;
+	private JLabel toLabel;
+	private JToggleButton toggleFavBtn;
+	private JPanel translatorPanel;
+	private JPanel translatorTab;
+	private JTextField vienDicFileInput;
+	private JButton vienDicFilebtn;
+	private JLabel vienDicLabel;
+	// private JTextField wordInput;
+	private JComboBox<Word> wordInputBox;
+	private JPanel wordInputPanel;
 	// End of variables declaration
 }

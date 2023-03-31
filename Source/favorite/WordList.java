@@ -1,5 +1,11 @@
 package favorite;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 
 public class WordList {
@@ -80,5 +86,33 @@ public class WordList {
 
 	public ArrayList<WordItem> getWordList() {
 		return list;
+	}
+
+	public void readCSV(File file) throws IOException {
+		try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+			String line;
+			while ((line = br.readLine()) != null) {
+				String[] values = line.split(",", 2);
+				list.add(new WordItem(values[0], values[1]));
+			}
+			br.close();
+		} catch (Exception e) {
+			throw e;
+		}
+	}
+
+	public void writeCSV(File file) throws IOException {
+		try {
+			FileWriter fw = new FileWriter(file);
+			BufferedWriter bw = new BufferedWriter(fw);
+			for (WordItem word : list) {
+				bw.write(word.getWord() + "," + word.getLang());
+				bw.newLine();
+			}
+			bw.close();
+			fw.close();
+		} catch (IOException e) {
+			throw e;
+		}
 	}
 }

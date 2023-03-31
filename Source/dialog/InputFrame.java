@@ -19,7 +19,6 @@ public class InputFrame extends JFrame {
     
     private JTextField textField;
     private JTextArea textArea;
-    private InputListener listener;
 
 	public interface InputListener {
         void onInput(String word, String meaning);
@@ -29,7 +28,6 @@ public class InputFrame extends JFrame {
 		super("Input Frame");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	
-        this.listener = listener;
 		// add panel
 		JPanel panel = new JPanel();
 		// insets
