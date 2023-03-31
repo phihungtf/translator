@@ -434,6 +434,7 @@ public class App extends javax.swing.JFrame implements InputFrame.InputListener 
 			TableColumn column = favWordTable.getColumnModel().getColumn(i);
 			column.setPreferredWidth(preferredWidth[i]);
 		}
+		favWordTable.setAutoCreateRowSorter(true);
 		favWordTable.addMouseListener(new MouseAdapter() {
 			public void mousePressed(MouseEvent mouseEvent) {
 				if (mouseEvent.getClickCount() == 2 && favWordTable.getSelectedRow() != -1) {

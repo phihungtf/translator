@@ -49,7 +49,7 @@ The application has the following features:
 - Remove a word from the dictionary.
 - Switch between English and Vietnamese.
 - Mark a word as a favorite word.
-- View all favorite words.
+- View all favorite words and sort them by alphabetical order.
 - Remove a word from the favorite list.
 - View history of words that have been looked up from a date to another date.
 
